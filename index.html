@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Face Recognition Attendance</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            background: linear-gradient(135deg, #d4edda, #c3e6cb); /* Light green background */
+            color: #333;
+            margin: 0;
+            padding: 0;
+            animation: fadeInBg 2s ease-in-out; /* Background fade-in animation */
+        }
+        h2 {
+            color: #333;
+            margin-top: 20px;
+            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.2);
+        }
+        video, canvas {
+            border: 2px solid #fff;
+            border-radius: 8px;
+            margin: 10px 0;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+        }
+        button {
+            background-color: #007bff; /* Blue buttons */
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            font-size: 16px;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: transform 0.3s, background-color 0.3s, box-shadow 0.3s;
+        }
+        button:hover {
+            background-color: #0056b3;
+            transform: scale(1.1);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+        }
+        button:active {
+            transform: scale(0.95);
+            background-color: #004085;
+        }
+        #status {
+            margin-top: 15px;
+            font-size: 16px;
+            color: #333;
+            animation: fadeIn 1s ease-in-out;
+        }
+        #employeeDetails {
+            display: none;
+            margin-top: 20px;
+            animation: slideDown 0.5s ease-in-out;
+            background-color: rgba(255, 255, 255, 0.8);
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+        }
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+            }
+            to {
+                opacity: 1;
+            }
+        }
+        @keyframes slideDown {
+            from {
+                transform: translateY(-20px);
+                opacity: 0;
+            }
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+        @keyframes fadeInBg {
+            from {
+                background: #c3e6cb;
+            }
+            to {
+                background: linear-gradient(135deg, #d4edda, #c3e6cb);
+            }
+        }
+    </style>
+</head>
+<body>
+    <h2>Face Recognition Attendance System</h2>
+    <button id="startButton" onclick="startCamera()">Start</button>
+    <div style="display: flex; justify-content: center; align-items: center; flex-direction: column;">
+        <video id="video" width="500" height="400" autoplay style="display:none; margin: 10px auto;"></video>
+        <div style="display: flex; justify-content: center; align-items: center; gap: 10px;">
+            <button id="captureButton" onclick="captureImage()" style="display:none;">Capture</button>
+            <button id="cancelButton" onclick="cancelOperation()" style="display:none;">Cancel</button>
+        </div>
+    </div>
+    <canvas id="canvas" width="300" height="250" style="display:none;"></canvas>
+    <p id="status"></p>
+
+    <!-- Employee Details -->
+    <div id="employeeDetails">
+        <h3>Employee Details</h3>
+        <img id="employeeImage" src="" width="150" height="150">
+        <p><strong>Name:</strong> <span id="employeeName"></span></p>
+        <p><strong>Sector:</strong> <span id="employeeSector"></span></p>
+        <button id="closeButton" onclick="closeDetails()">Close</button>
+    </div>
+
+    <script>
+        const video = document.getElementById("video");
+        const startButton = document.getElementById("startButton");
+        const captureButton = document.getElementById("captureButton");
+        const cancelButton = document.getElementById("cancelButton");
+
+        function startCamera() {
+            document.getElementById("status").innerText = "Scan your face to mark attendance"; // Show scan message
+            navigator.mediaDevices.getUserMedia({ video: true })
+                .then(stream => {
+                    video.srcObject = stream;
+                    video.style.display = "block";
+                    captureButton.style.display = "inline-block";
+                    cancelButton.style.display = "inline-block";
+                    startButton.style.display = "none";
+                })
+                .catch(err => {
+                    console.error("Error accessing webcam:", err);
+                    document.getElementById("status").innerText = "Error: Unable to access camera.";
+                });
+        }
+
+        function stopCamera() {
+            const stream = video.srcObject;
+            if (stream) {
+                const tracks = stream.getTracks();
+                tracks.forEach(track => track.stop());
+                video.srcObject = null;
+            }
+            video.style.display = "none";
+            captureButton.style.display = "none";
+            cancelButton.style.display = "none";
+            startButton.style.display = "inline-block";
+        }
+
+        function cancelOperation() {
+            document.getElementById("status").innerText = "Operation canceled.";
+            stopCamera();
+        }
+
+        function captureImage() {
+            document.getElementById("status").innerText = "Scanning..."; // Show scanning message
+            const canvas = document.getElementById("canvas");
+            const context = canvas.getContext("2d");
+            context.drawImage(video, 0, 0, 300, 250);
+
+            const imageData = canvas.toDataURL("image/png").split(",")[1]; // Send only Base64 data
+            stopCamera(); // Close the camera after capturing the image
+            scanFace(imageData);
+        }
+
+        function scanFace(imageBase64) {
+            document.getElementById("status").innerText = "Scanning...";
+
+            fetch("https://bsi1c0i2ma.execute-api.us-east-1.amazonaws.com/prod/scan-face", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ image: imageBase64 })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    document.getElementById("status").innerText = "Error: " + data.error;
+                    return;
+                }
+
+                // Show Employee Details
+                document.getElementById("employeeName").textContent = data.employee_name || "N/A";
+                document.getElementById("employeeSector").textContent = data.sector || "N/A";
+                document.getElementById("employeeImage").src = data.image_url || "https://dummyimage.com/150x150/cccccc/ffffff&text=No+Image";
+
+                document.getElementById("employeeDetails").style.display = "block";
+                document.getElementById("status").innerText = "Attendance marked!";
+            })
+            .catch(error => {
+                console.error("Error scanning face:", error);
+                document.getElementById("status").innerText = "Failed to scan face. Please try again.";
+            });
+        }
+
+        function markAttendance(employeeId, employeeName, sector, imageUrl) {
+            console.log("Sending Employee ID:", employeeId); // Debug log
+
+            fetch("https://bsi1c0i2ma.execute-api.us-east-1.amazonaws.com/prod/scan-face", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ 
+                    employee_id: employeeId,  // Ensure key matches exactly
+                    employee_name: employeeName,
+                    sector: sector,
+                    image_url: imageUrl // Include image URL
+                }) 
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    document.getElementById("status").innerText = "Error: " + data.error; // Show error message
+                } else {
+                    document.getElementById("status").innerText = "Attendance confirmed for " + employeeName; // Show success message
+                }
+                document.getElementById("employeeDetails").style.display = "none"; // Hide employee details
+            })
+            .catch(error => {
+                console.error("Error confirming attendance:", error);
+                document.getElementById("status").innerText = "Failed to confirm attendance. Please try again.";
+            });
+        }
+
+        function closeDetails() {
+            document.getElementById("employeeDetails").style.display = "none";
+        }
+    </script>
+</body>
+</html>

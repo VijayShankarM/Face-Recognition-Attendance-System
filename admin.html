@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin - Register Employee</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            background: linear-gradient(135deg, #d4edda, #c3e6cb); /* Light green background */
+            color: #333;
+            margin: 0;
+            padding: 20px;
+            animation: fadeInBg 2s ease-in-out; /* Background fade-in animation */
+        }
+        h2 {
+            color: #333;
+            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.2);
+        }
+        input, button {
+            margin: 10px;
+            padding: 10px;
+            font-size: 16px;
+            border-radius: 5px;
+            border: none;
+            transition: transform 0.3s, box-shadow 0.3s;
+        }
+        button {
+            background-color: #007bff; /* Blue buttons */
+            color: white;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #0056b3;
+            transform: scale(1.1);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+        }
+        button:active {
+            transform: scale(0.95);
+            background-color: #004085;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+            animation: fadeIn 1s ease-in-out;
+            background-color: rgba(255, 255, 255, 0.8);
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 10px;
+            text-align: left;
+            transition: background-color 0.3s;
+        }
+        tr:hover td {
+            background-color: rgba(255, 255, 255, 0.5);
+        }
+        img {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            transition: transform 0.3s;
+        }
+        img:hover {
+            transform: scale(1.2);
+        }
+        @keyframes fadeInBg {
+            from {
+                background: #c3e6cb;
+            }
+            to {
+                background: linear-gradient(135deg, #d4edda, #c3e6cb);
+            }
+        }
+        #message {
+            display: none;
+            margin-top: 20px;
+            padding: 10px;
+            border-radius: 5px;
+            font-size: 16px;
+            color: #fff;
+            background-color: #007bff;
+            animation: fadeIn 0.5s ease-in-out;
+        }
+        #message.error {
+            background-color: #dc3545;
+        }
+        #message.success {
+            background-color: #28a745;
+        }
+    </style>
+</head>
+<body>
+    <h2>Register New Employee</h2>
+    <div id="message"></div> <!-- Message container -->
+    <form id="employeeForm">
+        <input type="text" id="employeeID" placeholder="Employee ID" required>
+        <input type="text" id="name" placeholder="Name" required>
+        <input type="text" id="sector" placeholder="Sector" required>
+        <input type="file" id="imageFile" accept="image/*" required>
+        <button type="button" onclick="registerEmployee()">Register Employee</button>
+    </form>
+    <p id="status"></p>
+
+    <button onclick="fetchEmployees()">View Employees</button>
+    <table id="employeeTable">
+        <thead>
+            <tr>
+                <th>Employee ID</th>
+                <th>Name</th>
+                <th>Sector</th>
+                <th>Image</th>
+            </tr>
+        </thead>
+        <tbody></tbody>
+    </table>
+
+    <!-- View Attendance Section -->
+    <h2>View Attendance Records</h2>
+    <button onclick="fetchAttendance()">View Attendance</button>
+    <table id="attendanceTable" border="1">
+        <thead>
+            <tr>
+                <th>Employee ID</th>
+                <th>Name</th>
+                <th>Sector</th>
+                <th>Timestamp</th>
+                <th>Scanned Image</th>
+            </tr>
+        </thead>
+        <tbody></tbody>
+    </table>
+
+    <script>
+        const apiBaseUrl = "https://bsi1c0i2ma.execute-api.us-east-1.amazonaws.com/prod";
+
+        function showMessage(text, type = "success") {
+            const messageDiv = document.getElementById("message");
+            messageDiv.textContent = text;
+            messageDiv.className = type;
+            messageDiv.style.display = "block";
+            setTimeout(() => {
+                messageDiv.style.display = "none";
+            }, 3000); // Hide after 3 seconds
+        }
+
+        function registerEmployee() {
+            let employeeID = document.getElementById("employeeID").value;
+            let name = document.getElementById("name").value;
+            let sector = document.getElementById("sector").value;
+            let imageFile = document.getElementById("imageFile").files[0];
+
+            if (!employeeID || !name || !sector || !imageFile) {
+                showMessage("Please fill all fields and select an image.", "error");
+                return;
+            }
+
+            let reader = new FileReader();
+            reader.readAsDataURL(imageFile);
+            reader.onload = function () {
+                let base64Image = reader.result.split(',')[1];
+
+                let employeeData = {
+                    EmployeeID: employeeID,
+                    Name: name,
+                    Sector: sector,
+                    Image: base64Image
+                };
+
+                fetch(`${apiBaseUrl}/register-employee`, {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify(employeeData)
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.error) {
+                        showMessage("Error: " + data.error, "error");
+                    } else {
+                        showMessage("Employee Registered Successfully!", "success");
+                        location.reload();
+                    }
+                })
+                .catch(error => {
+                    console.error("Error:", error);
+                    showMessage("Failed to register employee.", "error");
+                });
+            };
+
+            reader.onerror = function (error) {
+                console.error("Error reading image file:", error);
+            };
+        }
+
+        async function fetchEmployees() {
+            showMessage("Fetching employees...", "success");
+            try {
+                const response = await fetch(`${apiBaseUrl}/register-employee`, {
+                    method: "GET",
+                    headers: { "Content-Type": "application/json" }
+                });
+
+                if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
+
+                const data = await response.json();
+                console.log("Employees:", data);
+
+                const tableBody = document.querySelector("#employeeTable tbody");
+                tableBody.innerHTML = ""; // Clear existing rows
+
+                if (data.length === 0) {
+                    tableBody.innerHTML = `<tr><td colspan="4" style="text-align: center;">Table is empty</td></tr>`; // Show empty message
+                    return;
+                }
+
+                data.forEach(employee => {
+                    const imageUrl = employee.Image || "https://dummyimage.com/150x150/cccccc/ffffff&text=No+Image"; // Use placeholder if Image is missing
+
+                    const row = `<tr>
+                        <td>${employee.EmployeeID}</td>
+                        <td>${employee.Name}</td>
+                        <td>${employee.Sector}</td>
+                        <td><img src="${imageUrl}" alt="Employee Image" style="width: 100px; height: 100px; object-fit: cover;"></td>
+                    </tr>`;
+                    tableBody.innerHTML += row;
+                });
+            } catch (error) {
+                console.error("Error fetching employees:", error);
+                showMessage("Failed to fetch employee data.", "error");
+            }
+        }
+
+        function fetchAttendance() {
+            showMessage("Fetching attendance records...", "success");
+            fetch(`${apiBaseUrl}/scan-face`) // Replace with your actual API endpoint
+            .then(response => response.json())
+            .then(data => {
+                let tableBody = document.querySelector("#attendanceTable tbody");
+                tableBody.innerHTML = ""; // Clear previous records
+
+                if (data.length === 0) {
+                    tableBody.innerHTML = `<tr><td colspan="5" style="text-align: center;">Table is empty</td></tr>`; // Show empty message
+                    return;
+                }
+
+                data.forEach(record => {
+                    let row = `<tr>
+                        <td>${record.EmployeeID}</td>
+                        <td>${record.EmployeeName}</td>
+                        <td>${record.Sector}</td>
+                        <td>${record.Timestamp}</td>
+                        <td><img src="${record.ImageURL}" alt="Scanned Image" style="width: 100px; height: 100px; object-fit: cover;"></td>
+                    </tr>`;
+                    tableBody.innerHTML += row;
+                });
+            })
+            .catch(error => {
+                console.error("Error fetching attendance:", error);
+                showMessage("Failed to fetch attendance records.", "error");
+            });
+        }
+    </script>
+</body>
+</html>
